@@ -1,0 +1,114 @@
+volumes:
+  arl_db:
+    external: true
+
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: arl:${ARL_VERSION:-local}
+    container_name: arl_web
+    restart: unless-stopped
+    depends_on:
+      - mongodb
+      - rabbitmq
+    ports:
+      - "${ARL_WEB_PORT:-5003}:443"
+    volumes:
+      - ./logs:/code/logs:rw
+      - ./config-docker.yaml:/code/app/config.yaml
+      - ./image:/code/app/tmp_screenshot
+      - ./poc:/opt/ARL-NPoC/xing/plugins/upload_poc
+    entrypoint: ["sh", "-c",
+      "gen_crt.sh;
+       nginx;
+       wait-for-it.sh mongodb:27017;
+       wait-for-it.sh rabbitmq:5672;
+       python /usr/bin/init_admin.py;
+       mkdir -p /code/logs;
+       gunicorn -b 0.0.0.0:5003 app.main:arl_app -w 3 --access-logfile /code/logs/arl_web.log --access-logformat '%({x-real-ip}i)s %(l)s %(u)s %(t)s \"%(r)s\" %(s)s %(b)s \"%(f)s\" \"%(a)s\"'"
+    ]
+    environment:
+      - LANG=en_US.UTF-8
+      - TZ=Asia/Shanghai
+      - ARL_WEB_PORT=${ARL_WEB_PORT:-5003}
+      - ARL_ADMIN_USERNAME=${ARL_ADMIN_USERNAME:-admin}
+      - ARL_ADMIN_PASSWORD=${ARL_ADMIN_PASSWORD:-arlpass}
+      - MONGO_URI=mongodb://${MONGO_INITDB_ROOT_USERNAME:-admin}:${MONGO_INITDB_ROOT_PASSWORD:-admin}@mongodb:27017/${MONGO_INITDB_DATABASE:-arl}?authSource=admin
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: arl:${ARL_VERSION:-local}
+    container_name: arl_worker
+    restart: unless-stopped
+    depends_on:
+      - mongodb
+      - rabbitmq
+    volumes:
+      - ./logs:/code/logs:rw
+      - ./config-docker.yaml:/code/app/config.yaml
+      - ./image:/code/app/tmp_screenshot
+      - ./poc:/opt/ARL-NPoC/xing/plugins/upload_poc
+    entrypoint: ["sh", "-c",
+      "wait-for-it.sh mongodb:27017;
+       wait-for-it.sh rabbitmq:5672;
+       mkdir -p /code/logs;
+       celery -A app.celerytask.celery worker -l info -Q arlgithub -n arlgithub -c ${CELERY_ARLGITHUB_CONCURRENCY:-2} -O fair -f /code/logs/arl_worker.log &
+       celery -A app.celerytask.celery worker -l info -Q arltask -n arltask -c ${CELERY_ARLTASK_CONCURRENCY:-2} -O fair -f /code/logs/arl_worker.log"
+    ]
+    environment:
+      - LANG=en_US.UTF-8
+      - TZ=Asia/Shanghai
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+
+  scheduler:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: arl:${ARL_VERSION:-local}
+    container_name: arl_scheduler
+    restart: unless-stopped
+    depends_on:
+      - mongodb
+      - rabbitmq
+    volumes:
+      - ./config-docker.yaml:/code/app/config.yaml
+    entrypoint: ["sh", "-c", "wait-for-it.sh mongodb:27017; wait-for-it.sh rabbitmq:5672; python -m app.scheduler" ]
+    environment:
+      - LANG=en_US.UTF-8
+      - TZ=Asia/Shanghai
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+
+  mongodb:
+    image: mongo:4.0.27
+    container_name: arl_mongodb
+    restart: always
+    volumes:
+      - arl_db:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-arl}
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME:-admin}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD:-admin}
+
+  rabbitmq:
+    image: rabbitmq:3.13.1-management-alpine
+    container_name: arl_rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER:-arl}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS:-arlpassword}
+      - RABBITMQ_DEFAULT_VHOST=${RABBITMQ_DEFAULT_VHOST:-arlv2host}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1M"
+        max-file: "10"
