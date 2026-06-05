@@ -34,8 +34,9 @@ services:
       - TZ=Asia/Shanghai
       - ARL_WEB_PORT=${ARL_WEB_PORT:-5003}
       - ARL_ADMIN_USERNAME=${ARL_ADMIN_USERNAME:-admin}
-      - ARL_ADMIN_PASSWORD=${ARL_ADMIN_PASSWORD:-arlpass}
-      - MONGO_URI=mongodb://${MONGO_INITDB_ROOT_USERNAME:-admin}:${MONGO_INITDB_ROOT_PASSWORD:-admin}@mongodb:27017/${MONGO_INITDB_DATABASE:-arl}?authSource=admin
+      - ARL_ADMIN_PASSWORD=${ARL_ADMIN_PASSWORD:?set ARL_ADMIN_PASSWORD in docker/.env}
+      - MONGO_URI=mongodb://${MONGO_INITDB_ROOT_USERNAME:-admin}:${MONGO_INITDB_ROOT_PASSWORD:?set MONGO_INITDB_ROOT_PASSWORD in docker/.env}@mongodb:27017/${MONGO_INITDB_DATABASE:-arl}?authSource=admin
+      - CELERY_BROKER_URL=amqp://${RABBITMQ_DEFAULT_USER:-arl}:${RABBITMQ_DEFAULT_PASS:?set RABBITMQ_DEFAULT_PASS in docker/.env}@rabbitmq:5672/${RABBITMQ_DEFAULT_VHOST:-arlv2host}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
 
   worker:
@@ -63,6 +64,8 @@ services:
     environment:
       - LANG=en_US.UTF-8
       - TZ=Asia/Shanghai
+      - MONGO_URI=mongodb://${MONGO_INITDB_ROOT_USERNAME:-admin}:${MONGO_INITDB_ROOT_PASSWORD:?set MONGO_INITDB_ROOT_PASSWORD in docker/.env}@mongodb:27017/${MONGO_INITDB_DATABASE:-arl}?authSource=admin
+      - CELERY_BROKER_URL=amqp://${RABBITMQ_DEFAULT_USER:-arl}:${RABBITMQ_DEFAULT_PASS:?set RABBITMQ_DEFAULT_PASS in docker/.env}@rabbitmq:5672/${RABBITMQ_DEFAULT_VHOST:-arlv2host}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
 
   scheduler:
@@ -81,6 +84,8 @@ services:
     environment:
       - LANG=en_US.UTF-8
       - TZ=Asia/Shanghai
+      - MONGO_URI=mongodb://${MONGO_INITDB_ROOT_USERNAME:-admin}:${MONGO_INITDB_ROOT_PASSWORD:?set MONGO_INITDB_ROOT_PASSWORD in docker/.env}@mongodb:27017/${MONGO_INITDB_DATABASE:-arl}?authSource=admin
+      - CELERY_BROKER_URL=amqp://${RABBITMQ_DEFAULT_USER:-arl}:${RABBITMQ_DEFAULT_PASS:?set RABBITMQ_DEFAULT_PASS in docker/.env}@rabbitmq:5672/${RABBITMQ_DEFAULT_VHOST:-arlv2host}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
 
   mongodb:
@@ -90,22 +95,18 @@ services:
     volumes:
       - arl_db:/data/db
       - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
-    ports:
-      - "27017:27017"
     environment:
       - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-arl}
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME:-admin}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD:-admin}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD:?set MONGO_INITDB_ROOT_PASSWORD in docker/.env}
 
   rabbitmq:
     image: rabbitmq:3.13.1-management-alpine
     container_name: arl_rabbitmq
     restart: always
-    ports:
-      - "5672:5672"
     environment:
       - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER:-arl}
-      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS:-arlpassword}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS:?set RABBITMQ_DEFAULT_PASS in docker/.env}
       - RABBITMQ_DEFAULT_VHOST=${RABBITMQ_DEFAULT_VHOST:-arlv2host}
     logging:
       driver: "json-file"

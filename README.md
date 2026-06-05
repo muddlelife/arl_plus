@@ -41,7 +41,7 @@ Docker 是当前推荐部署方式。应用镜像基于 `python:3.11-slim-bookwo
 ```bash
 cd docker/
 cp .env.example .env
-# 可选：编辑 .env，设置管理员账号、Celery 并发数、GitHub Token 等
+# 必须编辑 .env，设置管理员、MongoDB、RabbitMQ 密码
 docker volume create arl_db
 ARL_VERSION=local docker compose up -d --build
 ```
@@ -52,9 +52,10 @@ ARL_VERSION=local docker compose up -d --build
 https://<服务器IP>:5003/
 ```
 
-默认账号：`admin` / `arlpass`。可在 `docker/.env` 中通过 `ARL_ADMIN_USERNAME` 和 `ARL_ADMIN_PASSWORD` 修改，容器启动时会自动创建或更新管理员账号。
+登录账号由 `docker/.env` 中的 `ARL_ADMIN_USERNAME` 和 `ARL_ADMIN_PASSWORD` 决定，容器启动时会自动创建或更新管理员账号。公网部署前请务必使用强密码。
 
 Web 默认对外暴露 HTTPS 端口 `5003`。如需修改宿主机端口，请在 `docker/.env` 中设置 `ARL_WEB_PORT`，例如：`ARL_WEB_PORT=8443`。
+MongoDB 和 RabbitMQ 仅在 Docker 内部网络中访问，不会发布到宿主机端口。
 
 ## Docker 配置
 
@@ -64,14 +65,14 @@ Web 默认对外暴露 HTTPS 端口 `5003`。如需修改宿主机端口，请�
 | --- | --- | --- |
 | ARL_WEB_PORT | 5003 | Web HTTPS 宿主机端口 |
 | ARL_ADMIN_USERNAME | admin | Web 登录用户名 |
-| ARL_ADMIN_PASSWORD | arlpass | Web 登录密码 |
+| ARL_ADMIN_PASSWORD | 必填 | Web 登录密码 |
 | CELERY_ARLTASK_CONCURRENCY | 2 | 主任务队列 Worker 并发数 |
 | CELERY_ARLGITHUB_CONCURRENCY | 2 | GitHub 队列 Worker 并发数 |
 | MONGO_INITDB_ROOT_USERNAME | admin | MongoDB root 用户 |
-| MONGO_INITDB_ROOT_PASSWORD | admin | MongoDB root 密码 |
+| MONGO_INITDB_ROOT_PASSWORD | 必填 | MongoDB root 密码 |
 | MONGO_INITDB_DATABASE | arl | MongoDB 初始化数据库 |
 | RABBITMQ_DEFAULT_USER | arl | RabbitMQ 用户 |
-| RABBITMQ_DEFAULT_PASS | arlpassword | RabbitMQ 密码 |
+| RABBITMQ_DEFAULT_PASS | 必填 | RabbitMQ 密码 |
 | RABBITMQ_DEFAULT_VHOST | arlv2host | RabbitMQ vhost |
 | ARL_VERSION | local | 本地构建镜像 tag |
 | GITHUB_TOKEN | 空 | GitHub 关键字监控 Token |

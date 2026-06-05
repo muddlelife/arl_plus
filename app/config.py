@@ -106,6 +106,9 @@ try:
 
     Config.CELERY_BROKER_URL = y["CELERY"]["BROKER_URL"]
 
+    Config.MONGO_URL = os.environ.get("MONGO_URI", Config.MONGO_URL)
+    Config.CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", Config.CELERY_BROKER_URL)
+
     # *** Fofa 配置 ***
     Config.FOFA_KEY = y["FOFA"]["KEY"]
     if y["FOFA"].get("URL"):
